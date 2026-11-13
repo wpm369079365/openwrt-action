@@ -71,6 +71,11 @@ on:
         required: true
         type: string
         default: feat/padavanonly-2410
+      source_ref:
+        description: "Override the upstream branch/tag (empty = the profile's own branch)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -151,10 +156,15 @@ jobs:
         run: python3 "$PIPELINE/scripts/zerowrt.py" system install-llvm
 
       - name: Clone build source
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" source clone \
-            --dest "$ZEROWRT_SOURCE_DIR" \
-            --device "$ZEROWRT_DEVICE"
+          args=(--dest "$ZEROWRT_SOURCE_DIR" --device "$ZEROWRT_DEVICE")
+          if [ -n "$SOURCE_REF" ]; then
+            args+=(--ref "$SOURCE_REF")
+            echo "overriding the source branch: $SOURCE_REF"
+          fi
+          python3 "$PIPELINE/scripts/zerowrt.py" source clone "${args[@]}"
 
       - name: DIY part 1
         if: ${{ hashFiles('diy-part1.sh') != '' }}
