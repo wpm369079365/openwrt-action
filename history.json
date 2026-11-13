@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "generated": 1794554172,
+  "dist": "ZeroWrt",
+  "releases": [
+    {
+      "version": "20261113",
+      "build_date": 1794549664,
+      "url": "https://github.com/wpm369079365/openwrt-action/releases/download/ruijie_rg-x60-new-2410-homeproxy/zerowrt-mediatek-filogic-ruijie_rg-x60-new-squashfs-sysupgrade.bin",
+      "sha256": "dd457e031ab2d85302dfc2ebc10be709f45b5467b619cc5c98bda3e16b8c5136",
+      "size": 75285280,
+      "file": "zerowrt-mediatek-filogic-ruijie_rg-x60-new-squashfs-sysupgrade.bin",
+      "target": "mediatek/filogic",
+      "device": "ruijie_rg-x60-new",
+      "label": "Ruijie RG-X60 New",
+      "changelog": "**ZeroWrt 20261113**\n\nDevice: `ruijie_rg-x60-new`\n\nTarget: `mediatek/filogic`\n\nBuilt: 2026-11-13 06:01:04 UTC\n\nSource: [padavanonly/immortalwrt-mt798x-6.6@ec9ef10efc65](https://github.com/padavanonly/immortalwrt-mt798x-6.6/commit/ec9ef10efc65)\n\n[Workflow run](https://github.com/wpm369079365/openwrt-action/actions/runs/43375427355)"
+    }
+  ]
+}
