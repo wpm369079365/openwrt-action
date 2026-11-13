@@ -35,8 +35,8 @@ lgs2007m 那些 MT7981 工作流里能直接下拉选 `7.6.7.2-fw-20240823` 之�
 驱动是源码包 `package/mtk/drivers/mt_wifi`，版本跟着分支走，固件 blob 也随分支一起更新。
 当前 `openwrt-24.10-6.6` 上是 **7.6.6.1**。
 
-想试 padavanonly 的其它分支，用 `source_ref` 覆盖：填 `mt798x-mt799x-6.6-mtwifi` 之类即可，
-留空就用 profile 自带的分支。
+想换分支只能改 `scripts/zerowrt_core/profiles.py` 里的 `Source.ref`——工作流不暴露这个输入，
+避免一次构建悄悄换了源码树。
 
 ## 目录
 
@@ -84,5 +84,8 @@ docs/BUILD.md                   每个构建步骤做什么、补丁怎么刷新
 
 - 所有 profile 都带 `luci-app-ota`（系统 → OTA 固件更新）。第一次用之前去 **Settings → Pages**
   选 `gh-pages` 分支发布一次，否则固件默认查的 `https://<owner>.github.io/<repo>/ota.json` 是 404。
+- 界面上的输入只有 profile、LAN IP、root 密码、WiFi 名称密码，以及是否还原工具链缓存。
+  OTA 索引地址、工具链缓存仓库、源码分支都写死在 `build.yml` / `scripts/zerowrt_core/profiles.py`
+  里，没有对应选项，避免一次构建改掉它们。
 - 固件 Release 的 tag 就是 profile 名，重跑会覆盖同名资产（`overwrite_files: true`）。
 - 版权与许可见 `LICENSE`；流水线与补丁来自 ZeroWrt 项目，原作者信息保留在文件头。

@@ -181,7 +181,8 @@ root 密码通过 `openssl passwd -5 -stdin` 生成，密码不会出现在命�
 ### 5.4 Pages
 
 Settings → Pages → Deploy from a branch → `gh-pages` / `/`。
-默认索引地址是 `https://<owner>.github.io/<repo>/ota.json`。自定义域名见 README。
+索引地址固定为 `https://<owner>.github.io/<repo>/ota.json`，由 `build.yml` 从
+`GITHUB_REPOSITORY` 拼出来写进镜像，没有自定义域名的输入项。
 
 ## 6. 补丁刷新
 

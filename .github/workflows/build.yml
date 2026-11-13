@@ -46,31 +46,11 @@ on:
         required: true
         type: string
         default: "1234567890"
-      ota_url:
-        description: "OTA index URL (empty = GitHub Pages of this repository)"
-        required: false
-        type: string
-        default: ""
-      ota_cname:
-        description: "Optional custom domain for the OTA download page"
-        required: false
-        type: string
-        default: ""
       cache_toolchain:
         description: "Restore the toolchain cache when available"
         required: true
         type: boolean
         default: true
-      cache_repo:
-        description: "Repository holding the toolchain release (empty = this repository)"
-        required: false
-        type: string
-        default: ""
-      source_ref:
-        description: "Override the upstream branch/tag (empty = the profile's branch)"
-        required: false
-        type: string
-        default: ""
 
 permissions:
   contents: write
@@ -118,15 +98,10 @@ jobs:
         run: python3 scripts/zerowrt.py system install-deps
 
       - name: Clone build source
-        env:
-          SOURCE_REF: ${{ inputs.source_ref }}
         run: |
-          args=(--dest "$ZEROWRT_SOURCE_DIR" --device "$ZEROWRT_DEVICE")
-          if [ -n "$SOURCE_REF" ]; then
-            args+=(--ref "$SOURCE_REF")
-            echo "overriding the source branch: $SOURCE_REF"
-          fi
-          python3 scripts/zerowrt.py source clone "${args[@]}"
+          python3 scripts/zerowrt.py source clone \
+            --dest "$ZEROWRT_SOURCE_DIR" \
+            --device "$ZEROWRT_DEVICE"
 
       - name: DIY part 1
         if: ${{ hashFiles('diy-part1.sh') != '' }}
@@ -182,17 +157,11 @@ jobs:
       # The ota subcommands stand down on their own when the profile carries no
       # luci-app-ota, so these three steps are safe for every profile.
       - name: Embed OTA metadata
-        env:
-          OTA_URL_INPUT: ${{ inputs.ota_url }}
         run: |
           mkdir -p dist
-          if [ -n "$OTA_URL_INPUT" ]; then
-            OTA_URL="$OTA_URL_INPUT"
-          else
-            OWNER="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
-            REPO_NAME="${GITHUB_REPOSITORY#*/}"
-            OTA_URL="https://${OWNER}.github.io/${REPO_NAME}/ota.json"
-          fi
+          OWNER="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          OTA_URL="https://${OWNER}.github.io/${REPO_NAME}/ota.json"
           python3 scripts/zerowrt.py ota embed \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --api-url "$OTA_URL" \
@@ -202,11 +171,10 @@ jobs:
         if: ${{ inputs.cache_toolchain }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CACHE_REPO: ${{ inputs.cache_repo }}
         run: |
           python3 scripts/zerowrt.py cache restore \
             --tree "$ZEROWRT_SOURCE_DIR" \
-            --repo "${CACHE_REPO:-$GITHUB_REPOSITORY}"
+            --repo "$GITHUB_REPOSITORY"
 
       - name: Download source archives
         env:
@@ -282,7 +250,6 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OTA_CNAME: ${{ inputs.ota_cname }}
         run: |
           python3 scripts/zerowrt.py ota publish \
             --tree "$ZEROWRT_SOURCE_DIR" \
@@ -290,8 +257,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --tag "$ZEROWRT_DEVICE" \
             --branch gh-pages \
-            --site "$ZEROWRT_SOURCE_DIR/package/new/luci-app-ota/site" \
-            --cname "$OTA_CNAME"
+            --site "$ZEROWRT_SOURCE_DIR/package/new/luci-app-ota/site"
 
       - name: Trim build logs
         if: failure()
