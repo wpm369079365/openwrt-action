@@ -4,9 +4,11 @@
 
 | 文件 | profile | 源码树 | 代理栈 | OTA |
 |---|---|---|---|---|
-| `ruijie-rg-x60-new-2410-homeproxy.config` | `ruijie_rg-x60-new-2410-homeproxy` | ImmortalWrt 24.10 | HomeProxy + sing-box | 无 |
-| `ruijie-rg-x60-new-2410.config` | `ruijie_rg-x60-new-2410` | ImmortalWrt 24.10 | 无 | 无 |
-| `ruijie-rg-x60-new.config` | `ruijie_rg-x60-new` | ImmortalWrt 25.12 | HomeProxy + sing-box | 有 |
+| `ruijie-rg-x60-new-2410-homeproxy.config` | `ruijie_rg-x60-new-2410-homeproxy` | ImmortalWrt 24.10 | HomeProxy + sing-box | 有 |
+| `ruijie-rg-x60-new-2410.config` | `ruijie_rg-x60-new-2410` | ImmortalWrt 24.10 | 无 | 有 |
+
+`luci-app-ota` 不写在配置里——`config apply` 会自动追加它和中文包，详见
+`scripts/zerowrt_core/config.py` 的 `EXTRA_SELECTIONS`。
 
 构建时 `scripts/zerowrt_core/profiles.py` 按 profile 名找到这里的文件，直接 `defconfig`。
 

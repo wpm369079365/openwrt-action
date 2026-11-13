@@ -12,9 +12,8 @@ name: Build firmware
 #   diy-part2.sh         runs after the package set is in place (source edits)
 #   assets/              branding used by the in-tree customisation
 #
-# Profiles differ in the source tree, which is also the WiFi driver version:
-#   24.10 tree -> mt_wifi 7.6.6.1 (GCC 14)
-#   25.12 tree -> mt_wifi 7.6.7.2/7.6.7.3 (GCC 16)
+# Profiles differ only in the package set; every one builds from
+# padavanonly/immortalwrt-mt798x-6.6 (mt_wifi 7.6.6.1, GCC 14).
 
 on:
   workflow_dispatch:
@@ -27,7 +26,6 @@ on:
         options:
           - ruijie_rg-x60-new-2410-homeproxy
           - ruijie_rg-x60-new-2410
-          - ruijie_rg-x60-new
       lan_ip:
         description: "LAN IP (management address)"
         required: true
@@ -118,12 +116,6 @@ jobs:
 
       - name: Install build dependencies
         run: python3 scripts/zerowrt.py system install-deps
-
-      # Only the 25.12 tree compiles with clang; the 24.10 tree is GCC 14 and
-      # the LLVM install would just cost disk on a 14 GB runner.
-      - name: Install LLVM
-        if: ${{ !contains(inputs.device, '-2410') }}
-        run: python3 scripts/zerowrt.py system install-llvm
 
       - name: Clone build source
         env:

@@ -6,9 +6,9 @@ it to :func:`prune_feed_conflicts`; a duplicate package makes the buildroot
 pick one silently, which is how the wrong Clash core or an old Argon theme
 ends up in an image.
 
-The package list itself is not duplicated here: ``configs/ruijie-rg-x60-new.config``
-stays the authoritative selection. This module only makes sure every name the
-config asks for exists in the tree.
+The package list itself is not duplicated here: the device configs under
+``configs/`` stay the authoritative selection. This module only makes sure every
+name the config asks for exists in the tree.
 """
 
 from __future__ import annotations

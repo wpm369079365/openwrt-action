@@ -1,7 +1,7 @@
 """Apply the device ``.config`` and verify what defconfig kept.
 
-The package selection lives in ``configs/ruijie-rg-x60-new.config`` exactly as
-maintained by the MediaTek builder. This module only adds the few selections
+The package selection lives in ``configs/ruijie-rg-x60-new-2410*.config`` exactly
+as maintained by the MediaTek builder. This module only adds the few selections
 the rewritten pipeline requires (OTA app) and checks that defconfig did not
 silently drop the target or the applications the image is supposed to carry.
 """
@@ -42,8 +42,8 @@ REQUIRED_SELECTIONS = [
 
 SELECTION_RE = re.compile(r"^(CONFIG_[A-Za-z0-9_-]+)=y$", re.M)
 
-# Only the 25.12 tree ships a GCC 16 toolchain; asking for it on 24.10 fails
-# defconfig because the symbol does not exist there.
+# Only a tree that ships a GCC 16 toolchain may ask for it; the 24.10 tree
+# (the one wired in) is GCC 14 and has no such symbol, so defconfig would fail.
 GCC16_SELECTION = "CONFIG_GCC_USE_VERSION_16=y"
 
 

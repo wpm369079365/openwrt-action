@@ -1,6 +1,6 @@
 # openwrt-action
 
-锐界 RG-X60 New 的固件构建仓库，用法和 [P3TERX/Actions-OpenWrt](https://github.com/P3TERX/Actions-OpenWrt)、
+锐捷 RG-X60 New 的固件构建仓库，用法和 [P3TERX/Actions-OpenWrt](https://github.com/P3TERX/Actions-OpenWrt)、
 [lgs2007m/Actions-OpenWrt](https://github.com/lgs2007m/Actions-OpenWrt) 一样：
 改仓库里的东西 → 点 Actions → Release 里拿固件。
 
@@ -17,22 +17,26 @@
 
 | profile | 源码树 | 编译器 | mt_wifi | 代理栈 | OTA |
 |---|---|---|---|---|---|
-| `ruijie_rg-x60-new-2410-homeproxy`（默认） | ImmortalWrt 24.10 | GCC 14 | 7.6.6.1 | HomeProxy + sing-box | 无 |
-| `ruijie_rg-x60-new-2410` | ImmortalWrt 24.10 | GCC 14 | 7.6.6.1 | 无 | 无 |
-| `ruijie_rg-x60-new` | ImmortalWrt 25.12 | GCC 16 | 7.6.7.2/7.6.7.3 | HomeProxy + sing-box | 有 |
+| `ruijie_rg-x60-new-2410-homeproxy`（默认） | ImmortalWrt 24.10 | GCC 14 | 7.6.6.1 | HomeProxy + sing-box | 有 |
+| `ruijie_rg-x60-new-2410` | ImmortalWrt 24.10 | GCC 14 | 7.6.6.1 | 无 | 有 |
 
-三者分区布局一致（UBI 起于 `0x680000`），镜像可互刷。
+两个 profile 只有包选不同（HomeProxy 那一份多 `sing-box`），分区布局都是 UBI 起于 `0x680000`。
+
+## 源码
+
+唯一来源是 **[padavanonly/immortalwrt-mt798x-6.6](https://github.com/padavanonly/immortalwrt-mt798x-6.6)**
+的 `openwrt-24.10-6.6` 分支。别的树（例如把 MTK feeds 补丁导入 ImmortalWrt 25.12 的第三方
+rebase）不接进来：驱动、内核和补丁都是在 padavanonly 这棵树上验证的，换树等于换固件。
 
 ## 关于“驱动版本”
 
 lgs2007m 那些 MT7981 工作流里能直接下拉选 `7.6.7.2-fw-20240823` 之类，是因为 hanwckf 把
 `mt_wifi` 拆成了「驱动 + 固件 blob」的多个预编译包。padavanonly 这棵树不是这个结构：
-驱动是源码包 `package/mtk/drivers/mt_wifi`，版本跟着分支走，固件 blob 也随分支一起更新，
-所以**驱动版本 = 选源码树**（见上表的 mt_wifi 列）。
+驱动是源码包 `package/mtk/drivers/mt_wifi`，版本跟着分支走，固件 blob 也随分支一起更新。
+当前 `openwrt-24.10-6.6` 上是 **7.6.6.1**。
 
-想试别的分支，用 `source_ref` 覆盖：填 `mt798x-mt799x-6.6-mtwifi` 之类即可，留空就用
-profile 自带的分支。注意只能在同一棵树的 24.10 / 25.12 分支之间换——`scripts/000*.patch`
-是按 25.12 的 LuCI 刷新的，跨树会打错补丁。
+想试 padavanonly 的其它分支，用 `source_ref` 覆盖：填 `mt798x-mt799x-6.6-mtwifi` 之类即可，
+留空就用 profile 自带的分支。
 
 ## 目录
 
@@ -52,7 +56,7 @@ docs/BUILD.md                   每个构建步骤做什么、补丁怎么刷新
 
 ### configs/
 
-三份设备配置，改包改这里。`scripts/zerowrt_core/profiles.py` 里的 profile 决定用哪份；
+两份设备配置，改包改这里。`scripts/zerowrt_core/profiles.py` 里的 profile 决定用哪份；
 配置里 `=y` 的项必须在源码树里真实存在，否则 `defconfig` 会静默丢掉——细节见
 `configs/README.md`。
 
@@ -74,11 +78,11 @@ docs/BUILD.md                   每个构建步骤做什么、补丁怎么刷新
 `toolchain_<libc>_<arch>_gcc-<major>.tar.zst` 挂到本仓库的 `toolchain` release 上，
 之后 `Build firmware` 打开 `cache_toolchain` 就会还原，省 30–40 分钟。
 
-24.10 树不需要 LLVM，工作流已按 profile 自动跳过那一步。
+24.10 树用 GCC 14，不需要 LLVM，工作流里已经没有那一步。
 
 ## 注意
 
-- 24.10 两个 profile 的镜像**不带 OTA**，只能手动刷；OTA 相关步骤会自动跳过（日志里会说明）。
-- `ruijie_rg-x60-new`（25.12）这套配置切到 HomeProxy 后**尚未经过实际构建验证**，第一次跑可能要处理上游差异。
+- 所有 profile 都带 `luci-app-ota`（系统 → OTA 固件更新）。第一次用之前去 **Settings → Pages**
+  选 `gh-pages` 分支发布一次，否则固件默认查的 `https://<owner>.github.io/<repo>/ota.json` 是 404。
 - 固件 Release 的 tag 就是 profile 名，重跑会覆盖同名资产（`overwrite_files: true`）。
 - 版权与许可见 `LICENSE`；流水线与补丁来自 ZeroWrt 项目，原作者信息保留在文件头。

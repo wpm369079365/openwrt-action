@@ -6,8 +6,7 @@ name: Build toolchain cache
 # compile, which is roughly a third of a cold build.
 #
 # Run this once per profile, and again after the target, the libc or the GCC
-# version changes. The asset name carries the GCC major, so the 24.10 (GCC 14)
-# and 25.12 (GCC 16) caches coexist in the same release.
+# version changes. The asset name carries the GCC major (14 for this tree).
 
 on:
   workflow_dispatch:
@@ -20,7 +19,6 @@ on:
         options:
           - ruijie_rg-x60-new-2410-homeproxy
           - ruijie_rg-x60-new-2410
-          - ruijie_rg-x60-new
       source_ref:
         description: "Override the upstream branch/tag (empty = the profile's branch)"
         required: false
@@ -71,10 +69,6 @@ jobs:
 
       - name: Install build dependencies
         run: python3 scripts/zerowrt.py system install-deps
-
-      - name: Install LLVM
-        if: ${{ !contains(inputs.device, '-2410') }}
-        run: python3 scripts/zerowrt.py system install-llvm
 
       - name: Clone build source
         env:

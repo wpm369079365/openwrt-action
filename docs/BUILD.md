@@ -9,15 +9,15 @@
 
 | profile | 源码仓库 | 分支 | 上游 Device 名 | 配置 |
 | --- | --- | --- | --- | --- |
-| `ruijie_rg-x60-new` | `chasey-dev/immortalwrt-mt798x-rebase` | `25.12` | `ruijie_rg-x60-new-mtkuboot` | `configs/ruijie-rg-x60-new.config` |
 | `ruijie_rg-x60-new-2410` | `padavanonly/immortalwrt-mt798x-6.6` | `openwrt-24.10-6.6` | `ruijie_rg-x60-new` | `configs/ruijie-rg-x60-new-2410.config` |
-| `ruijie_rg-x60-new-2410-homeproxy` | 同上 | 同上 | 同上 | `configs/ruijie-rg-x60-new-2410-homeproxy.config` |
+| `ruijie_rg-x60-new-2410-homeproxy`（默认） | 同上 | 同上 | 同上 | `configs/ruijie-rg-x60-new-2410-homeproxy.config` |
 
-三个 profile 的目标都是 `mediatek/filogic`，布局为 MTK U-Boot（24.10 树的上游设备名没有
-`-mtkuboot` 后缀，但分区表与 sysupgrade-tar 格式一致，镜像可互刷）。
+两个 profile 的目标都是 `mediatek/filogic`，布局为 MTK U-Boot。上游设备名没有
+`-mtkuboot` 后缀，但分区表（UBI 起于 `0x680000`）与 sysupgrade-tar 格式与 MTK U-Boot 布局一致。
 
-源码都是公开仓库，不需要 `SOURCE_TOKEN`。需要写入权限的只有 `GITHUB_TOKEN`
-（Actions 自动提供）。
+源码是公开仓库，不需要 `SOURCE_TOKEN`。需要写入权限的只有 `GITHUB_TOKEN`
+（Actions 自动提供）。只接 padavanonly 这一棵树：把 MTK feeds 补丁导入 ImmortalWrt 25.12
+的第三方 rebase 不再作为可选项，驱动/内核/补丁都只在 padavanonly 树上验证过。
 
 新增设备时：在 `configs/` 放一份完整 `.config`，在
 `scripts/zerowrt_core/profiles.py` 的 `PROFILES` 里登记 `device`/`dt_model`，
@@ -33,14 +33,14 @@ profile 里的 `device`，不需要再维护一份列表。
 1. **free-disk**：删除 runner 上无用的 SDK，必要时用 LVM 合并 `/` 与 `/mnt`，
    创建 swap。根分区已经足够大时跳过清理。
 2. **install-deps**：安装 OpenWrt 编译依赖、`ccache`、`lvm2`、`xfsprogs`、
-   Python/Pillow 等。
-3. **install-llvm**：下载 sbwml 的 Clang 23 到 `/opt/clang`，写入 `GITHUB_PATH`。
-4. **source clone**：按 profile 克隆源码，写入 `.zerowrt-info.json`
+   Python/Pillow 等。24.10 树不需要 LLVM，`build.yml` 里已无 install-llvm 这一步
+   （CLI 的 `system install-llvm` 仍保留，供别的树使用）。
+3. **source clone**：按 profile 克隆源码，写入 `.zerowrt-info.json`
    （仓库、分支、commit、构建时间、设备）。
-5. **feeds update**：`./scripts/feeds update -a`，确认 `feeds/luci`、`feeds/packages`。
-6. **feeds install**：`./scripts/feeds install -a`，确认 `luci-compat`、`lyaml`、
+4. **feeds update**：`./scripts/feeds update -a`，确认 `feeds/luci`、`feeds/packages`。
+5. **feeds install**：`./scripts/feeds install -a`，确认 `luci-compat`、`lyaml`、
    `ttyd` 已安装。必须在克隆外部包之前执行，之后的替换会复用这些符号链接。
-7. **packages add**：
+6. **packages add**：
    - `MinimaxFlora/openwrt_package` → `package/new/helloworld`（移除 `autocore`）；
    - `sbwml/packages_lang_golang` `27.x`；
    - `sbwml/packages_lang_rust`；
@@ -50,36 +50,36 @@ profile 里的 `device`，不需要再维护一份列表。
      `luci-app-openlist2` 前端，取代已存档的 AList）；
    - 扫描 `package/new` 的 `PKG_NAME`/`BuildPackage`，删除 `feeds/` 与
      `package/feeds/` 里同名包。
-8. **source customize**：版本、发行字符串、IP、主机名、banner、root 密码、
+7. **source customize**：版本、发行字符串、IP、主机名、banner、root 密码、
    bash、profile、ttyd、MTK WiFi 默认值。
-9. **patches apply**：
+8. **patches apply**：
    - `0001`–`0005` 应用到 `feeds/luci`；
    - `0006` 应用到源码根（GCC 16）；
    - 复制 `900-*` 到 elfutils / libwebsockets 的 `patches/`；
    - 给 xl2tpd 加 `-std=gnu17`，给 bash 加 `no-lto`；
    - 全部做反向检查，重复运行是 no-op。
-10. **config apply**：复制设备配置，追加 `luci-app-ota` 与中文语言包，
+9. **config apply**：复制设备配置，追加 `luci-app-ota` 与中文语言包，
     `make defconfig`，校验 target、OTA、Argon、HomeProxy（含 sing-box 与中文包）、
     OpenList、vlmcsd、bash、ttyd。校验只针对渲染后的 `.config` 实际置 `y` 的项，
     因此关闭某个前端的 profile 不会被它误判。
-11. **ota embed**：写 `/etc/ota/build.json`、`version.date`、首次启动
+10. **ota embed**：写 `/etc/ota/build.json`、`version.date`、首次启动
     `/etc/uci-defaults/90-luci-app-ota`。
-12. **cache restore**（可选）：从 `toolchain` Release 恢复构建缓存。
-13. **build download**：`make -jN download`，失败后串行重试。
-14. **build compile**：`make -j(nproc+1) IGNORE_ERRORS="n m"`，失败后
+11. **cache restore**（可选）：从 `toolchain` Release 恢复构建缓存。
+12. **build download**：`make -jN download`，失败后串行重试。
+13. **build compile**：`make -j(nproc+1) IGNORE_ERRORS="n m"`，失败后
     `make -j1 ... V=s`。
-15. **build collect**：收集镜像、`Packages.tar.gz`、`build.config`、
+14. **build collect**：收集镜像、`Packages.tar.gz`、`build.config`、
     `BUILD_INFO.txt`、`SHA256SUMS`。
-16. **ota index**：生成 `dist/ota.json`。
-17. Release：tag `ruijie_rg-x60-new`，上传 `dist/*`。
-18. **ota publish**：更新 `gh-pages` 的 `ota.json`、`history.json` 和下载页。
+15. **ota index**：生成 `dist/ota.json`。
+16. Release：tag 就是 profile 名，上传 `dist/*`。
+17. **ota publish**：更新 `gh-pages` 的 `ota.json`、`history.json` 和下载页。
 
 ## 3. 环境变量
 
 | 变量 | 默认值 | 用途 |
 | --- | --- | --- |
 | `ZEROWRT_SOURCE_DIR` | `/builder/source` | 源码树 |
-| `ZEROWRT_DEVICE` | `ruijie_rg-x60-new` | profile |
+| `ZEROWRT_DEVICE` | `ruijie_rg-x60-new-2410-homeproxy` | profile |
 | `ZEROWRT_IP` | `10.0.0.1` | LAN IP |
 | `ZEROWRT_ROOT_PASSWORD` | `password` | root 密码（不打印） |
 | `ZEROWRT_WIFI_NAME` | `ZeroWrt` | SSID 前缀 |
@@ -119,8 +119,8 @@ root 密码通过 `openssl passwd -5 -stdin` 生成，密码不会出现在命�
 {
   "dist": "ZeroWrt",
   "version": "20261102",
-  "device": "ruijie_rg-x60-new-mtkuboot",
-  "model": "ruijie,rg-x60-new-mtkuboot",
+  "device": "ruijie_rg-x60-new",
+  "model": "ruijie,rg-x60-new",
   "target": "mediatek/filogic",
   "build_date": 1793600000,
   "product": "Ruijie RG-X60 New"
@@ -141,7 +141,7 @@ root 密码通过 `openssl passwd -5 -stdin` 生成，密码不会出现在命�
   "generated": 1793600100,
   "dist": "ZeroWrt",
   "devices": {
-    "ruijie_rg-x60-new-mtkuboot": {
+    "ruijie_rg-x60-new": {
       "version": "20261102",
       "build_date": 1793600000,
       "url": "https://github.com/<owner>/<repo>/releases/download/ruijie_rg-x60-new/<image>",
@@ -149,12 +149,12 @@ root 密码通过 `openssl passwd -5 -stdin` 生成，密码不会出现在命�
       "size": 33554432,
       "file": "<image>",
       "target": "mediatek/filogic",
-      "device": "ruijie_rg-x60-new-mtkuboot",
+      "device": "ruijie_rg-x60-new",
       "label": "Ruijie RG-X60 New",
       "changelog": "..."
     },
-    "ruijie,rg-x60-new-mtkuboot": { "...": "同一份 entry" },
-    "ruijie_rg-x60-new": { "...": "同一份 entry" }
+    "ruijie,rg-x60-new": { "...": "同一份 entry" },
+    "ruijie_rg-x60-new-2410-homeproxy": { "...": "同一份 entry" }
   }
 }
 ```
@@ -164,7 +164,7 @@ root 密码通过 `openssl passwd -5 -stdin` 生成，密码不会出现在命�
 
 镜像选择规则：只接受 `.bin/.itb/.img/.img.gz/.trx/.tar`，排除
 `initramfs`、`recovery`、`preloader`、`bl31`、`factory`、`kernel`、`rootfs` 等，
-优先 `sysupgrade` + `squashfs`。`mtkuboot` 名字里含 `uboot` 不会被误删。
+优先 `sysupgrade` + `squashfs`。
 
 ### 5.3 发布
 

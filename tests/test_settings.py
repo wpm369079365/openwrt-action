@@ -19,7 +19,7 @@ class SettingsTest(unittest.TestCase):
                 "ZEROWRT_IP": "192.168.8.1",
                 "ZEROWRT_WIFI_NAME": "Lab Net",
                 "ZEROWRT_WIFI_PASSWORD": "abcdefgh",
-                "ZEROWRT_DEVICE": "ruijie_rg-x60-new",
+                "ZEROWRT_DEVICE": "ruijie_rg-x60-new-2410-homeproxy",
                 "ZEROWRT_DIST": "ZeroLab",
             }
         )
@@ -59,39 +59,29 @@ class ProfilesTest(unittest.TestCase):
         self.assertEqual(
             profiles.names(),
             [
-                "ruijie_rg-x60-new",
                 "ruijie_rg-x60-new-2410",
                 "ruijie_rg-x60-new-2410-homeproxy",
             ],
         )
-        profile = profiles.require("ruijie_rg-x60-new")
-        self.assertEqual(profile.device, "ruijie_rg-x60-new-mtkuboot")
-        self.assertEqual(profile.config, "configs/ruijie-rg-x60-new.config")
+        self.assertEqual(profiles.DEFAULT_DEVICE, "ruijie_rg-x60-new-2410-homeproxy")
+        profile = profiles.require("ruijie_rg-x60-new-2410")
+        self.assertEqual(profile.device, "ruijie_rg-x60-new")
+        self.assertEqual(profile.config, "configs/ruijie-rg-x60-new-2410.config")
 
     def test_unknown_profile_raises(self) -> None:
         with self.assertRaises(util.BuildError):
             profiles.require("does-not-exist")
 
-    def test_source_points_at_the_mtk_rebase(self) -> None:
-        source = profiles.source(profiles.require("ruijie_rg-x60-new"))
-        self.assertEqual(source.repo, "chasey-dev/immortalwrt-mt798x-rebase")
-        self.assertEqual(source.ref, "25.12")
-        self.assertTrue(source.gcc16)
-        self.assertTrue(source.luci_patches)
-
-    def test_the_2410_profile_uses_the_plain_device_name(self) -> None:
-        profile = profiles.require("ruijie_rg-x60-new-2410")
-        self.assertEqual(profile.device, "ruijie_rg-x60-new")
-        self.assertEqual(profile.dt_model, "ruijie,rg-x60-new")
-        self.assertEqual(profile.config, "configs/ruijie-rg-x60-new-2410.config")
-        self.assertTrue((profiles.PROJECT_ROOT / profile.config).is_file())
-
-    def test_the_2410_source_disables_gcc16_and_luci_patches(self) -> None:
-        source = profiles.source(profiles.require("ruijie_rg-x60-new-2410"))
-        self.assertEqual(source.repo, "padavanonly/immortalwrt-mt798x-6.6")
-        self.assertEqual(source.ref, "openwrt-24.10-6.6")
-        self.assertFalse(source.gcc16)
-        self.assertFalse(source.luci_patches)
+    def test_every_profile_builds_from_padavanonly(self) -> None:
+        for name in profiles.names():
+            with self.subTest(profile=name):
+                source = profiles.source(profiles.require(name))
+                self.assertEqual(source.repo, "padavanonly/immortalwrt-mt798x-6.6")
+                self.assertEqual(source.ref, "openwrt-24.10-6.6")
+                self.assertFalse(source.gcc16)
+                self.assertFalse(source.luci_patches)
+                # luci-app-ota handles opkg, so OTA support stays on.
+                self.assertTrue(source.ota)
 
     def test_the_homeproxy_profile_reuses_the_2410_tree(self) -> None:
         plain = profiles.require("ruijie_rg-x60-new-2410")
