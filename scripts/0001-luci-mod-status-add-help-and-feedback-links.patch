@@ -1,0 +1,75 @@
+From 7fcc1d1130a4ea47a30b423549daf5d5dad19265 Mon Sep 17 00:00:00 2001
+From: MinimaxFlora <zj18139624826@gmail.com>
+Date: Thu, 20 Aug 2026 10:38:41 +0800
+Subject: [PATCH 1/5] luci-mod-status: add help and feedback links
+
+Signed-off-by: MinimaxFlora <zj18139624826@gmail.com>
+---
+ .../view/status/include/10_system.js          | 44 ++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+index aa46d48..0d5b936 100644
+--- a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
++++ b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+@@ -63,6 +63,43 @@ return baseclass.extend({
+ 	},
+ 
+ 	render: function(data) {
++			var style = E('style', {}, `
++				.support-btn {
++					display: inline-flex;
++					align-items: center;
++					justify-content: center;
++					height: 28px;
++					padding: 0 12px;
++					border-radius: 6px;
++					background: rgba(64, 158, 255, .85);
++					color: #fff !important;
++					font-size: 13px;
++					text-decoration: none !important;
++					transition: all .2s ease;
++					box-shadow: 0 2px 6px rgba(0, 0, 0, .15);
++					backdrop-filter: blur(6px);
++				}
++
++				.support-btn:hover {
++					transform: translateY(-2px);
++					box-shadow: 0 6px 14px rgba(0, 0, 0, .25);
++					opacity: .9;
++				}
++
++				.support-btn:active {
++					transform: scale(.92);
++				}
++
++				.support-btn:nth-child(2) {
++					background: rgba(103, 194, 58, .85);
++				}
++
++				.support-btn:nth-child(3) {
++					background: rgba(230, 162, 60, .85);
++				}
++		`	);
++			document.head.appendChild(style);
++			
+ 		var boardinfo   = data[0],
+ 		    systeminfo  = data[1],
+ 		    cpubench    = data[2],
+@@ -104,7 +141,12 @@ return baseclass.extend({
+ 				systeminfo.load[1] / 65535.0,
+ 				systeminfo.load[2] / 65535.0
+ 			) : null,
+-			_('CPU usage (%)'),    cpuusage.cpuusage
++			_('CPU usage (%)'),    cpuusage.cpuusage,
++			_('Help & Feedback'),  E('div', { 'style': 'display:flex;gap:8px;align-items:center;' }, [
++				E('a', { 'href': 'https://github.com/MinimaxFlora/ZeroWrt', 'target': '_blank', 'class': 'support-btn' }, _('Project Website')),
++				E('a', { 'href': 'https://github.com/MinimaxFlora/ZeroWrt/issues', 'target': '_blank', 'class': 'support-btn' }, _('Issue Feedback')),
++				E('a', { 'href': 'https://pay.kejizero.xyz', 'target': '_blank', 'class': 'support-btn' }, _('Donation Address'))
++			])
+ 		];
+ 
+ 		if (tempinfo.tempinfo) {
+-- 
+2.54.0.windows.1
+

@@ -8,8 +8,7 @@
 | `ruijie-rg-x60-new-2410.config` | `ruijie_rg-x60-new-2410` | ImmortalWrt 24.10 | 无 | 无 |
 | `ruijie-rg-x60-new.config` | `ruijie_rg-x60-new` | ImmortalWrt 25.12 | HomeProxy + sing-box | 有 |
 
-构建时这些文件会覆盖 `pipeline/configs/` 里的同名文件（ZeroWrt 自带一份作为默认），
-日志第一步会打印 `using local config ...` 说明用了哪份。
+构建时 `scripts/zerowrt_core/profiles.py` 按 profile 名找到这里的文件，直接 `defconfig`。
 
 ## 改配置的注意事项
 

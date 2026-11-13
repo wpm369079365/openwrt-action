@@ -1,18 +1,20 @@
 name: Build firmware
 
 # Firmware builder for the Ruijie RG-X60 New, in the spirit of
-# P3TERX/Actions-OpenWrt: the repository is the build recipe, GitHub Actions is
-# the compiler, the Release is the download page.
+# P3TERX/Actions-OpenWrt and lgs2007m/Actions-OpenWrt: this repository is the
+# build recipe, GitHub Actions is the compiler, the Release is the download page.
 #
-# What lives here:
-#   configs/*.config   device config, authoritative for builds from this repo
-#   diy-part1.sh       runs before `feeds update` (feeds.conf.default, extra clones)
-#   diy-part2.sh       runs after the package set is in place (source edits, files/)
-#   assets/            branding used by the in-tree customisation
+# Everything needed is here:
+#   scripts/zerowrt.py   the pipeline (source clone, feeds, package set, .config,
+#                        patches, OTA, toolchain cache)
+#   configs/*.config     device configs, one per profile
+#   diy-part1.sh         runs before `feeds update` (feeds.conf.default, clones)
+#   diy-part2.sh         runs after the package set is in place (source edits)
+#   assets/              branding used by the in-tree customisation
 #
-# What stays in ZeroWrt: the pipeline itself (feed pruning, .config rendering,
-# package verification, OTA). It is checked out at run time and never copied, so
-# one fix in the pipeline reaches every build that references it.
+# Profiles differ in the source tree, which is also the WiFi driver version:
+#   24.10 tree -> mt_wifi 7.6.6.1 (GCC 14)
+#   25.12 tree -> mt_wifi 7.6.7.2/7.6.7.3 (GCC 16)
 
 on:
   workflow_dispatch:
@@ -66,13 +68,8 @@ on:
         required: false
         type: string
         default: ""
-      pipeline_ref:
-        description: "ZeroWrt ref that holds the pipeline and the profiles"
-        required: true
-        type: string
-        default: feat/padavanonly-2410
       source_ref:
-        description: "Override the upstream branch/tag (empty = the profile's own branch)"
+        description: "Override the upstream branch/tag (empty = the profile's branch)"
         required: false
         type: string
         default: ""
@@ -90,7 +87,6 @@ env:
   ZEROWRT_SOURCE_DIR: /builder/source
   ZEROWRT_DEVICE: ${{ inputs.device }}
   ZEROWRT_DIST: ZeroWrt
-  PIPELINE: ${{ github.workspace }}/pipeline
   TZ: Asia/Shanghai
 
 jobs:
@@ -100,60 +96,34 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Checkout this repository
+      - name: Checkout
         uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
 
-      - name: Checkout build pipeline
-        uses: actions/checkout@v7.0.1
-        with:
-          repository: wpm369079365/ZeroWrt
-          ref: ${{ inputs.pipeline_ref }}
-          path: pipeline
-          fetch-depth: 1
-
-      # A file that exists here wins over the pipeline's copy. That keeps the
-      # device config reviewable in this repository without forking the whole
-      # pipeline, and the log line makes it obvious which copy was used.
-      - name: Apply local overrides
-        run: |
-          shopt -s nullglob
-          for file in configs/*.config; do
-            cp -f "$file" "$PIPELINE/configs/$(basename "$file")"
-            echo "using local config $(basename "$file")"
-          done
-          if [ -d assets ]; then
-            cp -rf assets/. "$PIPELINE/assets/"
-            echo "using local assets"
-          fi
-          cfg="$(python3 -c "import sys; sys.path.insert(0, '$PIPELINE/scripts'); from zerowrt_core import profiles; print(profiles.require('$ZEROWRT_DEVICE').config)")"
-          test -f "$PIPELINE/$cfg" || { echo "missing device config: $cfg" >&2; exit 1; }
-          echo "device config: $cfg"
-
-      - name: Show runner and pipeline commit
+      - name: Show runner and commit
         run: |
           python3 --version
           uname -a
-          echo "profile:  $ZEROWRT_DEVICE"
-          echo "pipeline: $(git -C "$PIPELINE" rev-parse --short HEAD) (${{ inputs.pipeline_ref }})"
+          echo "profile: $ZEROWRT_DEVICE"
+          echo "commit:  $(git rev-parse --short HEAD) ($(git rev-parse --abbrev-ref HEAD))"
 
       - name: Prepare build space
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" system free-disk \
+          python3 scripts/zerowrt.py system free-disk \
             --build-dir "$BUILD_ROOT" \
             --swap-gb 4 \
             --reserve-gb 6 \
             --min-free-gb 50
 
       - name: Install build dependencies
-        run: python3 "$PIPELINE/scripts/zerowrt.py" system install-deps
+        run: python3 scripts/zerowrt.py system install-deps
 
       # Only the 25.12 tree compiles with clang; the 24.10 tree is GCC 14 and
       # the LLVM install would just cost disk on a 14 GB runner.
       - name: Install LLVM
         if: ${{ !contains(inputs.device, '-2410') }}
-        run: python3 "$PIPELINE/scripts/zerowrt.py" system install-llvm
+        run: python3 scripts/zerowrt.py system install-llvm
 
       - name: Clone build source
         env:
@@ -164,7 +134,7 @@ jobs:
             args+=(--ref "$SOURCE_REF")
             echo "overriding the source branch: $SOURCE_REF"
           fi
-          python3 "$PIPELINE/scripts/zerowrt.py" source clone "${args[@]}"
+          python3 scripts/zerowrt.py source clone "${args[@]}"
 
       - name: DIY part 1
         if: ${{ hashFiles('diy-part1.sh') != '' }}
@@ -172,16 +142,17 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/diy-part1.sh"
         env:
           DIY_STAGE: part1
+          PIPELINE: ${{ github.workspace }}
 
       - name: Update feeds
-        run: python3 "$PIPELINE/scripts/zerowrt.py" source feeds-update --tree "$ZEROWRT_SOURCE_DIR"
+        run: python3 scripts/zerowrt.py source feeds-update --tree "$ZEROWRT_SOURCE_DIR"
 
       - name: Install feeds
-        run: python3 "$PIPELINE/scripts/zerowrt.py" source feeds-install --tree "$ZEROWRT_SOURCE_DIR"
+        run: python3 scripts/zerowrt.py source feeds-install --tree "$ZEROWRT_SOURCE_DIR"
 
       - name: Add external packages
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" packages add \
+          python3 scripts/zerowrt.py packages add \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --device "$ZEROWRT_DEVICE"
 
@@ -191,6 +162,7 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/diy-part2.sh"
         env:
           DIY_STAGE: part2
+          PIPELINE: ${{ github.workspace }}
 
       - name: Apply core customisations
         env:
@@ -199,29 +171,29 @@ jobs:
           ZEROWRT_WIFI_NAME: ${{ inputs.wifi_name }}
           ZEROWRT_WIFI_PASSWORD: ${{ inputs.wifi_password }}
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" source customize \
+          python3 scripts/zerowrt.py source customize \
             --tree "$ZEROWRT_SOURCE_DIR" \
-            --assets "$PIPELINE/assets"
+            --assets assets
 
       - name: Apply patches
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" patches apply \
+          python3 scripts/zerowrt.py patches apply \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --device "$ZEROWRT_DEVICE"
 
       - name: Apply device .config
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" config apply \
+          python3 scripts/zerowrt.py config apply \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --device "$ZEROWRT_DEVICE"
 
-      # The pipeline's ota subcommands stand down on their own when the profile
-      # carries no luci-app-ota, so these three steps are safe for every profile.
+      # The ota subcommands stand down on their own when the profile carries no
+      # luci-app-ota, so these three steps are safe for every profile.
       - name: Embed OTA metadata
         env:
           OTA_URL_INPUT: ${{ inputs.ota_url }}
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/dist"
+          mkdir -p dist
           if [ -n "$OTA_URL_INPUT" ]; then
             OTA_URL="$OTA_URL_INPUT"
           else
@@ -229,10 +201,10 @@ jobs:
             REPO_NAME="${GITHUB_REPOSITORY#*/}"
             OTA_URL="https://${OWNER}.github.io/${REPO_NAME}/ota.json"
           fi
-          python3 "$PIPELINE/scripts/zerowrt.py" ota embed \
+          python3 scripts/zerowrt.py ota embed \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --api-url "$OTA_URL" \
-            --emit "$GITHUB_WORKSPACE/ota-meta.json"
+            --emit ota-meta.json
 
       - name: Restore toolchain cache
         if: ${{ inputs.cache_toolchain }}
@@ -240,7 +212,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CACHE_REPO: ${{ inputs.cache_repo }}
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" cache restore \
+          python3 scripts/zerowrt.py cache restore \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --repo "${CACHE_REPO:-$GITHUB_REPOSITORY}"
 
@@ -249,7 +221,7 @@ jobs:
           TMPDIR: /builder/tmp
         run: |
           mkdir -p "$TMPDIR"
-          python3 "$PIPELINE/scripts/zerowrt.py" build download \
+          python3 scripts/zerowrt.py build download \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --jobs "$(nproc)"
 
@@ -257,21 +229,21 @@ jobs:
         env:
           TMPDIR: /builder/tmp
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" build compile \
+          python3 scripts/zerowrt.py build compile \
             --tree "$ZEROWRT_SOURCE_DIR" \
             --jobs "$(nproc)"
 
       - name: Collect artifacts
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" build collect \
+          python3 scripts/zerowrt.py build collect \
             --tree "$ZEROWRT_SOURCE_DIR" \
-            --out "$GITHUB_WORKSPACE/dist"
+            --out dist
 
       - name: Generate OTA index
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" ota index \
+          python3 scripts/zerowrt.py ota index \
             --tree "$ZEROWRT_SOURCE_DIR" \
-            --dist "$GITHUB_WORKSPACE/dist" \
+            --dist dist \
             --repo "$GITHUB_REPOSITORY" \
             --tag "$ZEROWRT_DEVICE"
 
@@ -280,15 +252,15 @@ jobs:
         run: |
           {
             echo "## Firmware build"
-            echo "profile: \`$ZEROWRT_DEVICE\` (pipeline ${{ inputs.pipeline_ref }} @ $(git -C "$PIPELINE" rev-parse --short HEAD))"
+            echo "profile: \`$ZEROWRT_DEVICE\` @ $(git rev-parse --short HEAD)"
             echo '```'
-            cat "$GITHUB_WORKSPACE/dist/BUILD_INFO.txt"
+            cat dist/BUILD_INFO.txt
             echo
-            ls -lh "$GITHUB_WORKSPACE/dist"
+            ls -lh dist
             echo '```'
             echo "### SHA256"
             echo '```'
-            cat "$GITHUB_WORKSPACE/dist/SHA256SUMS"
+            cat dist/SHA256SUMS
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -320,9 +292,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OTA_CNAME: ${{ inputs.ota_cname }}
         run: |
-          python3 "$PIPELINE/scripts/zerowrt.py" ota publish \
+          python3 scripts/zerowrt.py ota publish \
             --tree "$ZEROWRT_SOURCE_DIR" \
-            --dist "$GITHUB_WORKSPACE/dist" \
+            --dist dist \
             --repo "$GITHUB_REPOSITORY" \
             --tag "$ZEROWRT_DEVICE" \
             --branch gh-pages \
@@ -332,10 +304,10 @@ jobs:
       - name: Trim build logs
         if: failure()
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/dist"
+          mkdir -p dist
           for log in build download defconfig feeds-update feeds-install toolchain; do
             if [ -f "$ZEROWRT_SOURCE_DIR/$log.log" ]; then
-              tail -n 3000 "$ZEROWRT_SOURCE_DIR/$log.log" > "$GITHUB_WORKSPACE/dist/$log-tail.log"
+              tail -n 3000 "$ZEROWRT_SOURCE_DIR/$log.log" > "dist/$log-tail.log"
             fi
           done
 

@@ -1,0 +1,17 @@
+[project]
+name = "zerowrt-builder"
+version = "2.0.0"
+description = "Python-only build pipeline for ZeroWrt on MT798x (Ruijie RG-X60 New)"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+
+[project.optional-dependencies]
+dev = ["ruff"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]

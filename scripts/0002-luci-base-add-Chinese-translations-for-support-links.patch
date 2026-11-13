@@ -1,0 +1,57 @@
+From a2823df5ff2713a9119f533dac19e2b46abc460d Mon Sep 17 00:00:00 2001
+From: MinimaxFlora <zj18139624826@gmail.com>
+Date: Tue, 25 Aug 2026 14:27:02 +0800
+Subject: [PATCH 2/5] luci-base: add Chinese translations for support links
+
+Signed-off-by: MinimaxFlora <zj18139624826@gmail.com>
+---
+ modules/luci-base/po/zh_Hans/base.po | 36 ++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/modules/luci-base/po/zh_Hans/base.po b/modules/luci-base/po/zh_Hans/base.po
+index dd51a79..574a1cf 100644
+--- a/modules/luci-base/po/zh_Hans/base.po
++++ b/modules/luci-base/po/zh_Hans/base.po
+@@ -14840,3 +14840,39 @@ msgstr "移远蜂窝网络"
+ 
+ msgid "Temperature"
+ msgstr "温度"
++
++msgid "Help & Feedback"
++msgstr "帮助与反馈"
++
++msgid "Project Website"
++msgstr "项目主页"
++
++msgid "Issue Feedback"
++msgstr "问题反馈"
++
++msgid "Donation Address"
++msgstr "捐赠地址"
++
++msgid "Confirm Reboot"
++msgstr "确认重启"
++
++msgid "Are you sure you want to reboot the system?"
++msgstr "你确认要重启系统？"
++
++msgid "Confirm"
++msgstr "确认"
++
++msgid "Network Speed"
++msgstr "网络速率"
++
++msgid "Download Rate (RX)"
++msgstr "下行速率"
++
++msgid "Upload Rate (TX)"
++msgstr "上行速率"
++
++msgid "Calculating..."
++msgstr "计算中..."
++
++msgid "No active network interfaces"
++msgstr "无活动的网络接口"
+-- 
+2.54.0.windows.1
+
