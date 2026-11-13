@@ -1,0 +1,10 @@
+# build output, if anyone ever builds locally
+/builder/
+/dist/
+/ota-meta.json
+
+# editor
+.vscode/
+.idea/
+*.swp
+.DS_Store

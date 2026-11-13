@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+# Windows checkouts must not turn the hooks or the .config files into CRLF:
+# bash would fail on the shebang and defconfig would see stray \r characters.
+*.sh text eol=lf
+*.config text eol=lf
+*.yml text eol=lf

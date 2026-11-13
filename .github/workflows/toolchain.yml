@@ -1,0 +1,164 @@
+name: Build toolchain cache
+
+# Compiles the cross toolchain for one device profile and publishes it as
+# `toolchain_<libc>_<arch>_gcc-<major>.tar.zst` in the `toolchain` release of
+# this repository. "Build firmware" then restores it and skips the toolchain
+# compile, which is roughly a third of a cold build.
+#
+# Run this once per profile, and again after the target, the libc or the GCC
+# version changes. The asset name carries the GCC major, so the 24.10 (GCC 14)
+# and 25.12 (GCC 16) caches coexist in the same release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: "Device profile"
+        required: true
+        type: choice
+        default: ruijie_rg-x60-new-2410-homeproxy
+        options:
+          - ruijie_rg-x60-new-2410-homeproxy
+          - ruijie_rg-x60-new-2410
+          - ruijie_rg-x60-new
+      pipeline_ref:
+        description: "ZeroWrt ref that holds the pipeline and the profiles"
+        required: true
+        type: string
+        default: feat/padavanonly-2410
+
+permissions:
+  contents: write
+
+concurrency:
+  group: toolchain-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+  BUILD_ROOT: /builder
+  ZEROWRT_SOURCE_DIR: /builder/source
+  ZEROWRT_DEVICE: ${{ inputs.device }}
+  ZEROWRT_DIST: ZeroWrt
+  PIPELINE: ${{ github.workspace }}/pipeline
+  TZ: Asia/Shanghai
+
+jobs:
+  toolchain:
+    name: Build and publish the toolchain
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Checkout build pipeline
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: wpm369079365/ZeroWrt
+          ref: ${{ inputs.pipeline_ref }}
+          path: pipeline
+          fetch-depth: 1
+
+      - name: Apply local overrides
+        run: |
+          shopt -s nullglob
+          for file in configs/*.config; do
+            cp -f "$file" "$PIPELINE/configs/$(basename "$file")"
+            echo "using local config $(basename "$file")"
+          done
+          if [ -d assets ]; then
+            cp -rf assets/. "$PIPELINE/assets/"
+            echo "using local assets"
+          fi
+
+      - name: Show runner and pipeline commit
+        run: |
+          python3 --version
+          uname -a
+          echo "profile:  $ZEROWRT_DEVICE"
+          echo "pipeline: $(git -C "$PIPELINE" rev-parse --short HEAD) (${{ inputs.pipeline_ref }})"
+
+      - name: Prepare build space
+        run: |
+          python3 "$PIPELINE/scripts/zerowrt.py" system free-disk \
+            --build-dir "$BUILD_ROOT" \
+            --swap-gb 4 \
+            --reserve-gb 6 \
+            --min-free-gb 50
+
+      - name: Install build dependencies
+        run: python3 "$PIPELINE/scripts/zerowrt.py" system install-deps
+
+      - name: Install LLVM
+        if: ${{ !contains(inputs.device, '-2410') }}
+        run: python3 "$PIPELINE/scripts/zerowrt.py" system install-llvm
+
+      - name: Clone build source
+        run: |
+          python3 "$PIPELINE/scripts/zerowrt.py" source clone \
+            --dest "$ZEROWRT_SOURCE_DIR" \
+            --device "$ZEROWRT_DEVICE"
+
+      - name: DIY part 1
+        if: ${{ hashFiles('diy-part1.sh') != '' }}
+        working-directory: /builder/source
+        run: bash "$GITHUB_WORKSPACE/diy-part1.sh"
+        env:
+          DIY_STAGE: part1
+
+      - name: Update feeds
+        run: python3 "$PIPELINE/scripts/zerowrt.py" source feeds-update --tree "$ZEROWRT_SOURCE_DIR"
+
+      - name: Install feeds
+        run: python3 "$PIPELINE/scripts/zerowrt.py" source feeds-install --tree "$ZEROWRT_SOURCE_DIR"
+
+      - name: Add external packages
+        run: |
+          python3 "$PIPELINE/scripts/zerowrt.py" packages add \
+            --tree "$ZEROWRT_SOURCE_DIR" \
+            --device "$ZEROWRT_DEVICE"
+
+      - name: DIY part 2
+        if: ${{ hashFiles('diy-part2.sh') != '' }}
+        working-directory: /builder/source
+        run: bash "$GITHUB_WORKSPACE/diy-part2.sh"
+        env:
+          DIY_STAGE: part2
+
+      - name: Apply core customisations
+        run: |
+          python3 "$PIPELINE/scripts/zerowrt.py" source customize \
+            --tree "$ZEROWRT_SOURCE_DIR" \
+            --assets "$PIPELINE/assets"
+
+      - name: Apply patches
+        run: |
+          python3 "$PIPELINE/scripts/zerowrt.py" patches apply \
+            --tree "$ZEROWRT_SOURCE_DIR" \
+            --device "$ZEROWRT_DEVICE"
+
+      - name: Apply device .config
+        run: |
+          python3 "$PIPELINE/scripts/zerowrt.py" config apply \
+            --tree "$ZEROWRT_SOURCE_DIR" \
+            --device "$ZEROWRT_DEVICE"
+
+      - name: Build toolchain
+        env:
+          TMPDIR: /builder/tmp
+        run: |
+          mkdir -p "$TMPDIR"
+          cd "$ZEROWRT_SOURCE_DIR"
+          make -j"$(nproc)" toolchain/compile || make -j1 toolchain/compile V=s
+
+      - name: Publish toolchain cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 "$PIPELINE/scripts/zerowrt.py" cache save \
+            --tree "$ZEROWRT_SOURCE_DIR" \
+            --repo "$GITHUB_REPOSITORY"
