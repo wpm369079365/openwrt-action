@@ -232,19 +232,30 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Published with `gh` rather than a release action: the workflow token
+      # already creates the `toolchain` release through `gh`, while the
+      # third-party action answered 403 "Resource not accessible by
+      # integration" on the same token.
       - name: Publish device release
         if: success()
-        uses: softprops/action-gh-release@v3.0.3
-        with:
-          tag_name: ${{ env.ZEROWRT_DEVICE }}
-          name: ${{ env.ZEROWRT_DEVICE }}
-          target_commitish: ${{ github.sha }}
-          body_path: dist/BUILD_INFO.txt
-          files: dist/*
-          draft: false
-          prerelease: false
-          overwrite_files: true
-          fail_on_unmatched_files: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$ZEROWRT_DEVICE"
+          repo="$GITHUB_REPOSITORY"
+          if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+            gh release edit "$tag" --repo "$repo" \
+              --title "$tag" --notes-file dist/BUILD_INFO.txt
+          else
+            gh release create "$tag" --repo "$repo" \
+              --title "$tag" --target "$GITHUB_SHA" \
+              --notes-file dist/BUILD_INFO.txt
+          fi
+          mapfile -t files < <(find dist -maxdepth 1 -type f -print | sort)
+          gh release upload "$tag" "${files[@]}" --repo "$repo" --clobber
+          gh release view "$tag" --repo "$repo" --json url,assets \
+            --jq '"release: \(.url)  (\(.assets | length) assets)"' \
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Publish OTA page
         if: success()
