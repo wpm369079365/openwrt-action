@@ -9,6 +9,7 @@ WiFi network.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 from pathlib import Path
@@ -24,6 +25,7 @@ BANNER = Path("package/base-files/files/etc/banner")
 SHADOW = Path("package/base-files/files/etc/shadow")
 PASSWD = Path("package/base-files/files/etc/passwd")
 PROFILE = Path("package/base-files/files/etc/profile")
+DDNS_IPV6_SCRIPT = Path("package/base-files/files/usr/lib/ddns/get_ipv6.sh")
 TTYD_CONFIG = Path("feeds/packages/utils/ttyd/files/ttyd.config")
 TTYD_INIT = Path("feeds/packages/utils/ttyd/files/ttyd.init")
 TTYD_MENU = Path("feeds/luci/applications/luci-app-ttyd/root/usr/share/luci/menu.d/luci-app-ttyd.json")
@@ -218,7 +220,7 @@ def patch_profile(tree: Path, *, repo_root: Path, dist: str) -> None:
     passwd_text = util.read_text(passwd)
     passwd_text, count = re.subn(
         r"^(root:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:)[^:\n]*$",
-        r"\g<1>/usr/bin/bash",
+        r"\g<1>/bin/bash",
         passwd_text,
         count=1,
         flags=re.M,
@@ -235,6 +237,20 @@ def patch_profile(tree: Path, *, repo_root: Path, dist: str) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
     util.log(f"shell -> bash, prompt and {dist} PATH updated")
+
+
+def patch_ddns_ipv6(tree: Path, *, repo_root: Path) -> None:
+    """Ship the IPv6 IP-source script so reflashing never loses it again."""
+    tree = _tree(tree)
+    util.header("Installing ddns IPv6 IP source script")
+    source = Path(repo_root) / "scripts" / "get_ipv6.sh"
+    if not source.is_file():
+        raise util.BuildError(f"script asset not found: {source}")
+    destination = tree / DDNS_IPV6_SCRIPT
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, destination)
+    destination.chmod(0o755)
+    util.log(f"{DDNS_IPV6_SCRIPT} installed (mode 755)")
 
 
 def patch_ttyd(tree: Path) -> None:
@@ -443,6 +459,7 @@ def apply(tree: Path, settings: BuildSettings, *, assets: Path, repo_root: Path)
     patch_banner(tree, assets)
     patch_root_password(tree, settings.root_password)
     patch_profile(tree, repo_root=repo_root, dist=settings.dist_name)
+    patch_ddns_ipv6(tree, repo_root=repo_root)
     patch_ttyd(tree)
     patch_wifi(tree, settings)
     verify(tree, settings, assets=assets)
@@ -491,7 +508,7 @@ def verify(tree: Path, settings: BuildSettings, *, assets: Path) -> None:
         problems.append("root password hash is not SHA-256 crypt")
 
     passwd = util.read_text(tree / PASSWD)
-    if not re.search(r"^root:.*:/usr/bin/bash$", passwd, re.M):
+    if not re.search(r"^root:.*:/bin/bash$", passwd, re.M):
         problems.append("root shell is not bash")
 
     profile = util.read_text(tree / PROFILE)
@@ -502,6 +519,12 @@ def verify(tree: Path, settings: BuildSettings, *, assets: Path) -> None:
     ttyd = tree / TTYD_CONFIG
     if ttyd.exists() and "option command '/bin/login -f root'" not in util.read_text(ttyd):
         problems.append("ttyd auto login is not configured")
+
+    ddns_script = tree / DDNS_IPV6_SCRIPT
+    if not ddns_script.is_file():
+        problems.append("ddns IPv6 script is missing from the image")
+    elif not os.access(ddns_script, os.X_OK):
+        problems.append("ddns IPv6 script is not executable")
 
     relative = _wifi_defaults_file(tree)
     if relative is not None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import time
 import unittest
@@ -121,8 +122,12 @@ class CustomizeTest(unittest.TestCase):
         self.assertIn("10.0.0.1", (self.tree / "package/base-files/files/bin/config_generate").read_text())
         self.assertIn("hostname='ZeroWrt'", (self.tree / "package/base-files/files/bin/config_generate").read_text())
         self.assertIn("root:$5$fake$hash:", (self.tree / "package/base-files/files/etc/shadow").read_text())
-        self.assertIn("/usr/bin/bash", (self.tree / "package/base-files/files/etc/passwd").read_text())
+        self.assertIn("/bin/bash", (self.tree / "package/base-files/files/etc/passwd").read_text())
         self.assertIn("/opt/usr/sbin", (self.tree / "package/base-files/files/etc/profile").read_text())
+        ddns_script = self.tree / "package/base-files/files/usr/lib/ddns/get_ipv6.sh"
+        self.assertTrue(ddns_script.is_file())
+        self.assertIn("preferred_lft", ddns_script.read_text(encoding="utf-8"))
+        self.assertTrue(os.access(ddns_script, os.X_OK))
         self.assertEqual(
             (self.tree / "package/base-files/files/etc/banner").read_text(),
             "ZeroWrt banner\n",
